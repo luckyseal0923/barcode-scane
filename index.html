@@ -3,63 +3,126 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>iPhone Safari 條碼掃描</title>
+<title>拍照辨識商品條碼</title>
+
 <style>
-body{font-family:-apple-system,"Noto Sans TC",Arial;background:#f6f7f9;margin:0;padding:20px}
+body{
+  font-family:-apple-system,"Noto Sans TC",Arial;
+  background:#f6f7f9;
+  margin:0;
+  padding:20px;
+}
 h2{margin:0 0 10px}
-button{padding:10px 14px;border-radius:10px;border:0;background:#0a84ff;color:#fff;font-size:15px}
-.videoWrap{margin-top:12px;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3}
-video{width:100%;height:100%;object-fit:cover}
-.result{margin-top:12px;font-size:16px;font-weight:600}
-.small{font-size:13px;color:#555;margin-top:6px}
+.card{
+  background:#fff;
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 6px 18px rgba(0,0,0,.08);
+  max-width:420px;
+  margin:auto;
+}
+button{
+  width:100%;
+  padding:14px;
+  font-size:16px;
+  border-radius:12px;
+  border:0;
+  background:#0a84ff;
+  color:#fff;
+}
+.preview{
+  margin-top:12px;
+  border-radius:12px;
+  overflow:hidden;
+  background:#000;
+}
+img{
+  width:100%;
+  display:block;
+}
+.result{
+  margin-top:14px;
+  font-size:18px;
+  font-weight:700;
+}
+.status{
+  margin-top:6px;
+  font-size:13px;
+  color:#555;
+}
+input[type=file]{display:none}
 </style>
 </head>
 
 <body>
-<h2>📷 條碼掃描（iPhone Safari 修正版）</h2>
-<button id="startBtn">開始掃描</button>
 
-<div class="videoWrap">
-  <video id="video" playsinline muted></video>
+<div class="card">
+  <h2>📸 拍照掃描商品條碼</h2>
+
+  <button onclick="openCamera()">拍照掃描</button>
+
+  <input
+    id="fileInput"
+    type="file"
+    accept="image/*"
+    capture="environment"
+  />
+
+  <div class="preview" id="preview"></div>
+
+  <div class="result" id="result">尚未辨識</div>
+  <div class="status" id="status">狀態：等待拍照</div>
 </div>
 
-<div class="result" id="result">尚未掃描</div>
-<div class="small" id="status">狀態：等待開始</div>
-
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+
 <script>
-const video = document.getElementById("video");
-const startBtn = document.getElementById("startBtn");
+const fileInput = document.getElementById("fileInput");
+const preview = document.getElementById("preview");
 const resultEl = document.getElementById("result");
 const statusEl = document.getElementById("status");
 
-const codeReader = new ZXing.BrowserMultiFormatReader();
+const reader = new ZXing.BrowserMultiFormatReader();
 
-startBtn.addEventListener("click", () => {
-  statusEl.textContent = "狀態：要求相機權限中…";
+function openCamera(){
+  fileInput.click();
+}
 
-  // ⚠️ 關鍵：所有相機啟動都在 click 同步流程內
-  navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: "environment" } },
-    audio: false
-  }).then(stream => {
-    video.srcObject = stream;
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  if(!file) return;
 
-    // ⚠️ Safari 關鍵點：play 不能被 await
-    video.play();
+  statusEl.textContent = "狀態：照片讀取中…";
+  resultEl.textContent = "辨識中…";
 
-    statusEl.textContent = "狀態：相機已啟動，掃描中…";
+  // 顯示照片
+  const img = document.createElement("img");
+  img.src = URL.createObjectURL(file);
+  preview.innerHTML = "";
+  preview.appendChild(img);
 
-    codeReader.decodeFromVideoElement(video, (result, err) => {
-      if (result) {
+  try{
+    const image = new Image();
+    image.src = img.src;
+
+    image.onload = async () => {
+      try{
+        const result = await reader.decodeFromImageElement(image);
         resultEl.textContent = "商品編號：" + result.getText();
+        statusEl.textContent = "狀態：辨識成功";
+      }catch(e){
+        resultEl.textContent = "❌ 無法辨識條碼";
+        statusEl.textContent = "狀態：請重新拍照，確保條碼清楚";
       }
-    });
-  }).catch(err => {
+    };
+
+  }catch(err){
     console.error(err);
-    statusEl.textContent = "狀態：相機啟動失敗（請確認權限）";
-  });
+    resultEl.textContent = "❌ 發生錯誤";
+    statusEl.textContent = "狀態：辨識失敗";
+  }
 });
 </script>
+
 </body>
 </html>
